@@ -1,0 +1,52 @@
+#!/bin/bash
+
+PACKAGE=haproxy
+VERSION=1.5-dev19
+REVISION=agora-`date +%Y%m%d-%H%M`
+TARGET="$PACKAGE-$VERSION"
+DEPLOY_PATH=/home/vagrant/debian-packages/`lsb_release -cs`/$PACKAGE/
+GIT_USER=`git config --global user.name`
+GIT_EMAIL=`git config --global user.email`
+
+rm -rf $TARGET-with-patches
+cp -pr $TARGET $TARGET-with-patches
+
+cd $TARGET-with-patches
+wget "http://haproxy.1wt.eu/download/1.5/src/snapshot/haproxy-1.5-dev19-patches-LATEST.tar.gz"
+tar -xzf haproxy-1.5-dev19-patches-LATEST.tar.gz
+PATCH_VERSION=`ls . | egrep $TARGET-patches-[0-9]{8} | egrep -o [0-9]{8}`
+
+for i in $TARGET-patches-$PATCH_VERSION/*.diff; do if [ -s $i ]; then echo "  $i ..."; cat $i | (patch -p1) || exit 1; fi; done
+
+
+make TARGET=linux2628 \
+  CPU=generic \
+  ARCH=x86_64 \
+  IGNOREGIT=true \
+  USE_PCRE=1 \
+  USE_OPENSSL=1 \
+  USE_CPU_AFFINITY=1 \
+  SUBVERS="-p$PATCH_VERSION"
+
+rm -rf /tmp/$TARGET
+mkdir -p /tmp/$TARGET/etc
+make install DESTDIR=/tmp/$TARGET
+
+# haproxy/make insists on installing into /usr/local, so fix that
+mv /tmp/$TARGET/usr/local/* /tmp/$TARGET/usr
+rmdir /tmp/$TARGET/usr/local
+
+# Copy configuration files and a helper script
+cp -pr examples/errorfiles /tmp/$TARGET/etc/errorfiles
+cp examples/*.cfg /tmp/$TARGET/etc/
+cp examples/*.sh /tmp/$TARGET/usr/sbin
+cd ..
+
+rm -f $TARGET.deb
+fpm -s dir -t deb -n $PACKAGE -v $VERSION --iteration p$PATCH_VERSION-$REVISION -C /tmp/$TARGET \
+  -p $TARGET.deb \
+  -d "libc6 (>= 2.14)" \
+  -d "libpcre3 (>= 8.10)" \
+  -d "libssl1.0.0 (>= 1.0.0)" \
+  --maintainer "$GIT_USER <$GIT_EMAIL>" \
+  usr etc
