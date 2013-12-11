@@ -11,7 +11,7 @@ BOOTSTRAP = <<SCRIPT
 HOME=/home/vagrant
 ln -s /vagrant ~/#{PROJECT_NAME}
 apt-get update
-apt-get install -y build-essential libpcre3-dev libzlcore-dev libssl-dev libgeoip-dev git #{GIT_EDITOR}
+apt-get install -y build-essential libpcre3-dev libzlcore-dev libssl-dev git #{GIT_EDITOR}
 
 #HOME=/home/vagrant
 sudo -u vagrant git config --global core.editor "#{GIT_EDITOR}"
